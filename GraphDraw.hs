@@ -92,6 +92,8 @@ ghostStyle        = GC {gcFG = (35000, 35000, 35000), gcLW=2, gcLS=True}
 pixmapWidth = 3000
 pixmapHeight = 5000
 
+viewportWidth = 400
+
 minScaling = 0.05
 maxScaling = 2.00
 fitMargin = 25
@@ -260,6 +262,7 @@ graphDrawNew = do
     -- viewport inside scrolled window
     scrolladj <- G.adjustmentNew 0 0 100 5 30 30
     viewport <- G.viewportNew scrolladj scrolladj
+    G.widgetSetSizeRequest viewport viewportWidth (-1) 
     G.widgetShow viewport
     G.containerAdd scroll viewport
 
