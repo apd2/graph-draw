@@ -154,6 +154,7 @@ data GAnnotation = GAnnotation {
 data GNode = GNode {
     gnAnnot     :: [GAnnotation],
     gnCoords    :: (Double,Double),  -- node coordinates
+    gnRScale    :: Double,           -- node radius scaling factor
     gnLineStyle :: GC,
     gnAreaStyle :: GC
 } deriving (Typeable,Data)
@@ -362,10 +363,10 @@ graphDrawSetMode ref mode = do
     writeIORef ref $ graph {gMode = mode}
     forceGraphUpdate ref
 
-graphDrawInsertNode :: RGraphDraw -> GNodeId -> [GAnnotation] -> (Double, Double) -> (GC, GC) -> IO ()
-graphDrawInsertNode ref id annots coords (linestyle, areastyle) = do
+graphDrawInsertNode :: RGraphDraw -> GNodeId -> [GAnnotation] -> (Double, Double) -> Double -> (GC, GC) -> IO ()
+graphDrawInsertNode ref id annots coords rscale (linestyle, areastyle) = do
     graph <- readIORef ref
-    let newgraph = graph {gGraph = (insNode (id, GNode annots coords linestyle areastyle) (gGraph graph))}
+    let newgraph = graph {gGraph = (insNode (id, GNode annots coords rscale linestyle areastyle) (gGraph graph))}
     writeIORef ref newgraph
     forceGraphUpdate ref
 
@@ -945,19 +946,20 @@ drawState :: GraphDraw -> G.Pixmap -> GNodeId -> (Double, Double) -> IO ()
 drawState graph pixmap node (x,y) = do
     --putStrLn $ "drawState " ++ (show node)
     let gn = gNode (gGraph graph) node
+    let radius = nodeRadius * gnRScale gn
     gcArea <- (G.gcNewWithValues pixmap) $ gcToGCV $ gnAreaStyle gn
-    drawArcD graph pixmap gcArea True (x-nodeRadius) (y-nodeRadius) (nodeRadius * 2) (nodeRadius * 2) 0 (64*360)
+    drawArcD graph pixmap gcArea True (x-radius) (y-radius) (radius * 2) (radius * 2) 0 (64*360)
     gc <- if Just node == gActiveNode graph
              then (G.gcNewWithValues pixmap) $ (gcToGCV $ gnLineStyle gn) {G.lineWidth = (gcLW $ gnLineStyle gn) + 1}
              else (G.gcNewWithValues pixmap) $ gcToGCV $ gnLineStyle gn
-    drawArcD graph pixmap gc False (x-nodeRadius) (y-nodeRadius) (nodeRadius * 2) (nodeRadius * 2) 0 (64*360)
+    drawArcD graph pixmap gc False (x-radius) (y-radius) (radius * 2) (radius * 2) 0 (64*360)
 
     let annots = filter ((/= "") . annotText) $ gnAnnot gn
     mapM (\(a,n) -> do layout <- G.widgetCreateLayout (gDrawingArea graph) (annotText a)
                        gct <- (G.gcNewWithValues pixmap) (gcToGCV $ annotTextStyle a)
                        (_, G.Rectangle _ _ _ height) <- G.layoutGetPixelExtents layout
                        let height' = (fromIntegral height) / (gScaling graph)
-                       drawLayoutD graph pixmap gct (x + nodeRadius + 2) 
+                       drawLayoutD graph pixmap gct (x + radius + 2) 
                                                     (y + (fromIntegral n*height') - (fromIntegral (length annots) * height') / 2) layout)
          $ zip annots [0..]
     return ()
@@ -1083,7 +1085,7 @@ dimensions graph =
         (_, node):rest -> 
             let (x0,y0) = gnCoords node
                 (minx, maxx, miny, maxy) = 
-                  foldr (\(_, GNode _ (x,y) _ _) (minx, maxx, miny, maxy) -> 
+                  foldr (\(_, GNode _ (x,y) _ _ _) (minx, maxx, miny, maxy) -> 
                           ((min x minx), (max x maxx), (min y miny), (max y maxy))) (x0,x0,y0,y0) rest
             in (minx, miny, (maxx-minx), (maxy-miny))
 
