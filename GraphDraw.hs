@@ -105,7 +105,7 @@ edgeProximityThreshold = 4
 cornerProximityThreshold = 5
 defaultFontSize = 12
 
-nodeRadius = 16 :: Double
+defNodeRadius = 16 :: Double
 activeCornerRadius = 4 :: Double
 targetRadius = 10
 
@@ -347,10 +347,10 @@ graphDrawFitToScreen ref = do
     --putStrLn $ "Visible area:" ++ show (xsize,ysize)
     let xscaling = if x+width == 0
                       then 1 
-                      else min 1 ((fromIntegral xsize) / (x+width+nodeRadius+fitMargin))
+                      else min 1 ((fromIntegral xsize) / (x+width+defNodeRadius+fitMargin))
         yscaling = if y+height == 0
                       then 1 
-                      else min 1 ((fromIntegral ysize) / (y+height+nodeRadius+fitMargin))
+                      else min 1 ((fromIntegral ysize) / (y+height+defNodeRadius+fitMargin))
         scaling = (max (min xscaling yscaling) minScaling) * 100
     --putStrLn $ "scaling = " ++ show scaling
     G.rangeSetValue (gScale graph) scaling
@@ -697,6 +697,9 @@ nodesAtLocation graph x y =
 nodeCoords :: GraphDraw -> Node -> (Double, Double)
 nodeCoords graph node = gnCoords $ gNode (gGraph graph) node
 
+nodeRadius :: GraphDraw -> Node -> Double
+nodeRadius graph node = defNodeRadius * (gnRScale $ gNode (gGraph graph) node)
+
 edgesAtLocation :: GraphDraw -> Double -> Double -> [((GNodeId,GNodeId,GEdge), Int)]
 edgesAtLocation graph x y =
     foldr (\(from, to, edge) es -> let (dist,segment) = distanceToEdge graph x y (from, to, edge)
@@ -748,6 +751,8 @@ edgeToPath :: GraphDraw -> GNodeId -> GNodeId -> [(Double, Double)] -> [((Double
 edgeToPath graph from to corners = 
     let (x1, y1) = nodeCoords graph from
         (x2, y2) = nodeCoords graph to
+        fradius = nodeRadius graph from
+        tradius = nodeRadius graph to
         points = (x1,y1):corners ++ [(x2,y2)]
         rpoints = {-trace ("points:" ++ show points)-} reverse points
         -- the edge must start and end at the boundary of the state circle, not in the center
@@ -755,16 +760,16 @@ edgeToPath graph from to corners =
         lastSegmentLen = ((x2 - (fst $ head $ tail rpoints)) * (x2 - (fst $ head $ tail rpoints)) + (y2 - (snd $ head $ tail rpoints)) * (y2 - (snd $ head $ tail rpoints))) ** 0.5
         x1' = if firstSegmentLen == 0
                 then x1
-                else x1 + ((nodeRadius * ((fst $ head $ tail points)-x1)) / firstSegmentLen)
+                else x1 + ((fradius * ((fst $ head $ tail points)-x1)) / firstSegmentLen)
         y1' = if firstSegmentLen == 0
                  then y1
-                 else y1 + ((nodeRadius * ((snd $ head $ tail points) - y1)) / firstSegmentLen)
+                 else y1 + ((fradius * ((snd $ head $ tail points) - y1)) / firstSegmentLen)
         x2' = if lastSegmentLen == 0
                  then x2
-                 else x2 + ((nodeRadius * ((fst $ head $ tail rpoints) - x2)) / lastSegmentLen)
+                 else x2 + ((tradius * ((fst $ head $ tail rpoints) - x2)) / lastSegmentLen)
         y2' = if lastSegmentLen == 0
                  then y2
-                 else y2 + ((nodeRadius * ((snd $ head $ tail rpoints) - y2)) / lastSegmentLen)
+                 else y2 + ((tradius * ((snd $ head $ tail rpoints) - y2)) / lastSegmentLen)
         points' = (x1',y1'):corners ++ [(x2',y2')]
     in {-trace ("points': " ++ (show $ init $ init $ tails points'))-}foldr (\ps pairs -> (head ps, head $ tail ps):pairs) [] (init $ init $ tails points')
 
@@ -774,7 +779,8 @@ isNodeAtLocation :: GraphDraw -> Node -> Double -> Double -> Bool
 isNodeAtLocation graph node x y = 
     -- TODO: use different radius for simple states and sets of states
     let (x',y') = nodeCoords graph node
-    in (x-x') * (x-x') + (y-y') * (y-y') <= nodeRadius * nodeRadius
+        r = nodeRadius graph node
+    in (x-x') * (x-x') + (y-y') * (y-y') <= r * r
 
 lineSlope :: Double -> Double -> Double -> Double -> Double
 lineSlope x y x' y' = 
@@ -946,7 +952,7 @@ drawState :: GraphDraw -> G.Pixmap -> GNodeId -> (Double, Double) -> IO ()
 drawState graph pixmap node (x,y) = do
     --putStrLn $ "drawState " ++ (show node)
     let gn = gNode (gGraph graph) node
-    let radius = nodeRadius * gnRScale gn
+    let radius = nodeRadius graph node
     gcArea <- (G.gcNewWithValues pixmap) $ gcToGCV $ gnAreaStyle gn
     drawArcD graph pixmap gcArea True (x-radius) (y-radius) (radius * 2) (radius * 2) 0 (64*360)
     gc <- if Just node == gActiveNode graph
@@ -969,11 +975,11 @@ drawGhostState graph pixmap = do
     --putStrLn $ "drawGhostState"
     gc <- (G.gcNewWithValues pixmap) (gcToGCV ghostStyle)
     let (x,y) = gMousePosition graph
-    drawArcD  graph pixmap gc False (x-nodeRadius) (y-nodeRadius) (nodeRadius * 2) (nodeRadius * 2) 0 (64*360)
-    drawLineD graph pixmap gc (x, y-nodeRadius+1) (x, y-nodeRadius+8)
-    drawLineD graph pixmap gc (x, y+nodeRadius-1) (x, y+nodeRadius-8)
-    drawLineD graph pixmap gc (x-nodeRadius+1, y) (x-nodeRadius+8, y)
-    drawLineD graph pixmap gc (x+nodeRadius-1, y) (x+nodeRadius-8, y)
+    drawArcD  graph pixmap gc False (x-defNodeRadius) (y-defNodeRadius) (defNodeRadius * 2) (defNodeRadius * 2) 0 (64*360)
+    drawLineD graph pixmap gc (x, y-defNodeRadius+1) (x, y-defNodeRadius+8)
+    drawLineD graph pixmap gc (x, y+defNodeRadius-1) (x, y+defNodeRadius-8)
+    drawLineD graph pixmap gc (x-defNodeRadius+1, y) (x-defNodeRadius+8, y)
+    drawLineD graph pixmap gc (x+defNodeRadius-1, y) (x+defNodeRadius-8, y)
 
 drawTarget :: GraphDraw -> G.Pixmap -> IO ()
 drawTarget graph pixmap = do
