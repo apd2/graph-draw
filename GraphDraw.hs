@@ -67,7 +67,6 @@ import qualified Data.GraphViz.Types as GVT
 import qualified Data.GraphViz.Types.Graph as GVTG
 import qualified Data.GraphViz.Types.Canonical as GVTC
 import qualified Data.Text.Lazy as T
-import Data.Graph.Inductive.Graphviz
 import Data.GraphViz.Parsing
 import Data.GraphViz.Commands
 import Data.GraphViz.Attributes.Complete
@@ -92,7 +91,7 @@ ghostStyle        = GC {gcFG = (35000, 35000, 35000), gcLW=2, gcLS=True}
 pixmapWidth = 3000
 pixmapHeight = 5000
 
-viewportWidth = 400
+viewportWidth = 200
 
 minScaling = 0.05
 maxScaling = 2.00
@@ -491,11 +490,13 @@ graphDrawAutoLayout ref fname edges = do
     graph <- readIORef ref
     let g' = autoLayoutPreprocess (gGraph graph) edges
         -- Convert graph into dot format
-        graphstr = graphviz (gmap (\(pred, id, _, suc) -> (pred, id, id, suc)) $ emap geId g') "" 
-                            (6.0, 11.0) (1,1) Portrait
+        --graphstr = graphviz (gmap (\(pred, id, _, suc) -> (pred, id, id, suc)) $ emap geId g') "" 
+        --                    (6.0, 11.0) (1,1) Portrait
         -- parse the resulting graph
-        gv = (GVT.parseDotGraph (T.pack graphstr))::(GVTG.DotGraph Int)
-        -- dump automatic layout into file
+        --gv = (GVT.parseDotGraph (T.pack graphstr))::(GVTG.DotGraph Int)
+        gv = GVTG.mkGraph (map (\n -> GVT.DotNode n []) $ nodes g')
+                          (map (\(f,t,e) -> GVT.DotEdge f t []) $ labEdges g')
+    -- dump automatic layout into file
     catch (do runGraphvizCommand Data.GraphViz.Commands.Dot gv DotOutput fname
               layoutstr <- readFile fname
               let layoutgr = (GVT.parseDotGraph (T.pack layoutstr))::(GVTG.DotGraph Int)
